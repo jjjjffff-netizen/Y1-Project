@@ -1,0 +1,167 @@
+#include <LiquidCrystal.h>
+
+// LCD Keypad Shield pins
+LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+
+// ---- PIN ASSIGNMENT ----
+#define IR_SENSOR_LEFT  A4      
+#define IR_SENSOR_RIGHT A5
+
+// ---- ENCODER CONFIGURATION ----
+// On Arduino Uno, interrupts are only on Pin 2 and 3
+#define LEFT_ENCODER_PIN  2 
+#define RIGHT_ENCODER_PIN 3
+
+// Robot Physical Constants 
+const float WHEEL_DIAMETER = 6.5; // in meters (e.g., 65mm = 0.065m)
+const float COUNTS_PER_REV = 20.0;  // Number of holes in your encoder disk (usually 20)
+const float DISTANCE_PER_TICK = (3.14159 * WHEEL_DIAMETER) / COUNTS_PER_REV;
+
+volatile unsigned long leftEncoderCount = 0;
+volatile unsigned long rightEncoderCount = 0;
+
+// ---- MOTOR PINS ----
+#define MOTOR_SPEED 90          // Increased slightly to overcome friction
+
+// LEFT MOTOR (L298N OUT1/OUT2)
+int enableLeftMotor = 11;       // PWM
+int leftMotorPin1   = 13;
+int leftMotorPin2   = 12;
+
+// RIGHT MOTOR (L298N OUT3/OUT4)
+int enableRightMotor = 10;      // PWM (Moved from 3)
+int rightMotorPin1   = A1;      // Digital (Moved from 2)
+int rightMotorPin2   = A3;
+
+// -------------------------------------------------------------------
+
+void setup()
+{
+    lcd.begin(16, 2);
+    lcd.print("Encoder Mode");
+    
+    // Motor pins
+    pinMode(enableLeftMotor, OUTPUT);
+    pinMode(leftMotorPin1, OUTPUT);
+    pinMode(leftMotorPin2, OUTPUT);
+
+    pinMode(enableRightMotor, OUTPUT);
+    pinMode(rightMotorPin1, OUTPUT);
+    pinMode(rightMotorPin2, OUTPUT);
+
+    // IR sensor inputs
+    pinMode(IR_SENSOR_LEFT, INPUT);
+    pinMode(IR_SENSOR_RIGHT, INPUT);
+
+    // Encoder Pins
+    pinMode(LEFT_ENCODER_PIN, INPUT_PULLUP); // Use internal pullup resistor
+    pinMode(RIGHT_ENCODER_PIN, INPUT_PULLUP);
+
+    // Attach Interrupts
+    // When the signal changes from LOW to HIGH (RISING), call the counter function
+    attachInterrupt(digitalPinToInterrupt(LEFT_ENCODER_PIN), countLeft, RISING);
+    attachInterrupt(digitalPinToInterrupt(RIGHT_ENCODER_PIN), countRight, RISING);
+
+    // Start stopped
+    rotateMotor(0, 0);
+}
+
+// -------------------------------------------------------------------
+// Interrupt Service Routines (ISRs)
+// These run automatically whenever the wheel turns
+// -------------------------------------------------------------------
+void countLeft() {
+    leftEncoderCount++;
+}
+
+void countRight() {
+    rightEncoderCount++;
+}
+
+// -------------------------------------------------------------------
+
+void loop()
+{
+    int leftIR  = digitalRead(IR_SENSOR_LEFT);
+    int rightIR = digitalRead(IR_SENSOR_RIGHT);
+
+    // ---- LINE FOLLOWING LOGIC (Logic preserved from your code) ----
+    // Note: I adjusted the +/- logic slightly to match standard conventions
+    // If your wheels spin backwards, swap HIGH/LOW in rotateMotor
+    
+    if (leftIR == LOW && rightIR == LOW) {
+        // Stop
+        rotateMotor(0, 0);
+    }
+    else if (leftIR == HIGH && rightIR == HIGH) {
+        // Forward
+        rotateMotor(MOTOR_SPEED, MOTOR_SPEED); // Both positive for forward
+    }
+    else if (leftIR == LOW && rightIR == HIGH) {
+        // Turn Left (Left motor back, Right motor forward)
+        rotateMotor(-MOTOR_SPEED, MOTOR_SPEED);
+    }
+    else if (leftIR == HIGH && rightIR == LOW) {
+        // Turn Right (Left motor forward, Right motor back)
+        rotateMotor(MOTOR_SPEED, -MOTOR_SPEED);
+    }
+
+    // ---- DISTANCE CALCULATION ----
+    // Average the ticks from both wheels for accuracy
+    float avgTicks = (leftEncoderCount + rightEncoderCount) / 2.0;
+    float distanceMeters = avgTicks * DISTANCE_PER_TICK;
+
+    // ---- LCD Display ----
+    // Update LCD every 200ms to prevent flickering
+    static unsigned long lastLCDUpdate = 0;
+    if (millis() - lastLCDUpdate > 200) {
+        lastLCDUpdate = millis();
+        
+        lcd.setCursor(0, 1);
+        lcd.print("D:");
+        lcd.print(distanceMeters); // Default 2 decimal places
+        lcd.print("m ");
+        
+        // Debug: Show raw ticks on the right side if needed
+        // lcd.print(leftEncoderCount); 
+    }
+}
+
+// -------------------------------------------------------------------
+// Motor control function
+// -------------------------------------------------------------------
+void rotateMotor(int leftMotorSpeed, int rightMotorSpeed)
+{
+   // LEFT MOTOR
+    if (leftMotorSpeed > 0) {
+        digitalWrite(leftMotorPin1, HIGH);
+        digitalWrite(leftMotorPin2, LOW);
+    } 
+    else if (leftMotorSpeed < 0) {
+        digitalWrite(leftMotorPin1, LOW);
+        digitalWrite(leftMotorPin2, HIGH);
+        leftMotorSpeed = -leftMotorSpeed; // Make speed positive for analogWrite
+    } 
+    else {
+        digitalWrite(leftMotorPin1, LOW);
+        digitalWrite(leftMotorPin2, LOW);
+    }
+
+    // RIGHT MOTOR
+    if (rightMotorSpeed > 0) {
+        digitalWrite(rightMotorPin1, HIGH);
+        digitalWrite(rightMotorPin2, LOW);
+    } 
+    else if (rightMotorSpeed < 0) {
+        digitalWrite(rightMotorPin1, LOW);
+        digitalWrite(rightMotorPin2, HIGH);
+        rightMotorSpeed = -rightMotorSpeed; 
+    } 
+    else {
+        digitalWrite(rightMotorPin1, LOW);
+        digitalWrite(rightMotorPin2, LOW);
+    }
+
+    analogWrite(enableLeftMotor, leftMotorSpeed);
+    analogWrite(enableRightMotor, rightMotorSpeed);
+}
