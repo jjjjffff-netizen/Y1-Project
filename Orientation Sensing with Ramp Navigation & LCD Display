@@ -1,0 +1,187 @@
+#include <LiquidCrystal.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+
+// LCD Setup
+LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+
+// MPU6050 Setup
+Adafruit_MPU6050 mpu;
+
+// Motor Pins
+const int IN1 = 13;
+const int IN2 = 12;
+const int IN3 = 2;
+const int IN4 = A2; 
+const int ENA = 11;
+const int ENB = 3;  
+
+// Logic Variables
+bool onRamp = false;       // Have we started climbing?
+float maxRampAngle = 0;    // Store the steepest angle measured
+float gyroZOffset = 0;     // For calibration
+
+// Settings
+const float RAMP_THRESHOLD = 5.0;  // Angle to detect "I am on a ramp"
+const float FLAT_THRESHOLD = 3.0;  // Angle to detect "I am flat again"
+
+void setup() {
+  Serial.begin(115200);
+  lcd.begin(16, 2);
+  
+  // Pins
+  pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
+  pinMode(ENA, OUTPUT); pinMode(ENB, OUTPUT);
+
+  // Init MPU
+  if (!mpu.begin()) {
+    lcd.print("MPU Error");
+    while (1);
+  }
+  
+  // Setup Sensor
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+
+  lcd.print("Calibrating...");
+  calibrateGyro();
+  lcd.clear();
+  lcd.print("Go!");
+}
+
+void loop() {
+  // 1. Get Current Tilt (Pitch)
+  float pitch = getPitch();
+
+  // 2. Drive Forward continuously
+  moveForward();
+
+  // 3. Logic: Check if we are on the ramp
+  if (abs(pitch) > RAMP_THRESHOLD) {
+    onRamp = true;
+    
+    // Record the steepest angle found
+    if (abs(pitch) > maxRampAngle) {
+      maxRampAngle = abs(pitch);
+    }
+
+    // Update LCD while climbing
+    lcd.setCursor(0, 0);
+    lcd.print("Climbing...   ");
+    lcd.setCursor(0, 1);
+    lcd.print("Ang: "); lcd.print(abs(pitch), 1);
+  }
+
+  // 4. Logic: Check if we reached the top (Flat again)
+  // We only trigger this if we were ALREADY on the ramp (onRamp == true)
+  if (onRamp == true && abs(pitch) < FLAT_THRESHOLD) {
+    
+    // STOP SEQUENCE
+    stopMotors();
+    
+    // Display Max Angle recorded
+    lcd.clear();
+    lcd.print("Max Angle:");
+    lcd.setCursor(0, 1);
+    lcd.print(maxRampAngle);
+    lcd.print((char)223); // Degree symbol
+    
+    // Wait 4 Seconds
+    delay(4000);
+
+    // Spin 360
+    performTurn(360);
+
+    // Stop Forever
+    while(true) {
+      stopMotors();
+    }
+  }
+  
+  delay(50); // Small stability delay
+}
+
+// ---------------------------------------------------------
+// SENSOR FUNCTIONS
+// ---------------------------------------------------------
+
+float getPitch() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+  
+  // Calculate Pitch (Tilt up/down)
+  // Warning: Depending on how your sensor is mounted, you might need 
+  // to swap .x and .y or change signs.
+  // Ideally: X-axis points forward.
+  float pitch = atan2(a.acceleration.x, a.acceleration.z);
+  
+  // Convert Radians to Degrees
+  return pitch * 57.296;
+}
+
+void calibrateGyro() {
+  float sum = 0;
+  for (int i = 0; i < 200; i++) {
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+    sum += g.gyro.z;
+    delay(3);
+  }
+  gyroZOffset = sum / 200.0; // Average offset
+}
+
+// ---------------------------------------------------------
+// MOVEMENT FUNCTIONS
+// ---------------------------------------------------------
+
+void moveForward() {
+  analogWrite(ENA, 200); 
+  analogWrite(ENB, 200); // Adjust if car drifts left/right
+  digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+}
+
+void stopMotors() {
+  analogWrite(ENA, 0); analogWrite(ENB, 0);
+  digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+}
+
+void performTurn(float targetAngle) {
+  lcd.clear();
+  lcd.print("Spinning 360...");
+  
+  float currentYaw = 0;
+  unsigned long previousTime = millis();
+  
+  // Start Spinning
+  analogWrite(ENA, 180); 
+  analogWrite(ENB, 180);
+  digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH); // Opposing directions
+
+  while (abs(currentYaw) < targetAngle) {
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+
+    unsigned long currentTime = millis();
+    float dt = (currentTime - previousTime) / 1000.0;
+    previousTime = currentTime;
+
+    // Integrate Gyro Z
+    float gyroRate = (g.gyro.z - gyroZOffset) * 57.296;
+    if (abs(gyroRate) < 0.5) gyroRate = 0; // Filter noise
+
+    currentYaw += gyroRate * dt;
+    
+    // Debug output
+    if (millis() % 100 == 0) {
+       lcd.setCursor(0, 1);
+       lcd.print(abs(currentYaw));
+    }
+  }
+  stopMotors();
+}
