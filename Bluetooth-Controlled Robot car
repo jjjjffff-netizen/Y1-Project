@@ -1,0 +1,155 @@
+#include <LiquidCrystal.h>
+
+// LCD pins: RS=D8, EN=D9, D4=D4, D5=D5, D6=D6, D7=D7
+LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+
+// --- MOTOR CONFIGURATION ---
+const int IN1 = 13;
+const int IN2 = 12;
+const int IN3 = 2;
+const int IN4 = A4; // PWM
+const int ENA = 11; // PWM left motor
+const int ENB = 3;  // PWM right motor
+
+// Bluetooth STATE pin
+const int BT_STATE = A5; // HC-05 STATE/EN pin connected here
+
+// Speed Variable (0-255)
+int motorSpeed = 255; 
+char command; // Variable to store incoming Bluetooth data
+
+// Track Bluetooth connection
+bool isConnected = false;
+
+void setup() {
+  // Initialize Serial for commands
+  Serial.begin(9600); 
+
+  // LCD Setup
+  lcd.begin(16, 2);
+  lcd.setCursor(0, 0);
+  lcd.print("BT Module Init");
+
+  // Motor Pins
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  // Bluetooth STATE pin
+  pinMode(BT_STATE, INPUT);
+
+  // Stop motors initially
+  stopCar();
+
+  delay(1000);
+  lcd.clear();
+}
+
+void loop() {
+  // Check Bluetooth connection via STATE pin
+  if (digitalRead(BT_STATE) == HIGH && !isConnected) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Connection");
+    lcd.setCursor(0, 1);
+    lcd.print("Established");
+    isConnected = true;
+    delay(1000); // show message briefly
+    lcd.clear();
+  } else if (digitalRead(BT_STATE) == LOW && isConnected) {
+    // Optional: show disconnected message
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("BT Disconnected");
+    isConnected = false;
+    delay(1000);
+    lcd.clear();
+  }
+
+  // Check for Bluetooth commands
+  if (Serial.available() > 0) {
+    command = Serial.read();
+
+    switch (command) {
+      case 'F':
+        moveForward();
+        updateLCD("Forward");
+        break;
+      case 'B':
+        moveBackward();
+        updateLCD("Backward");
+        break;
+      case 'L':
+        turnLeft();
+        updateLCD("Turn Left");
+        break;
+      case 'R':
+        turnRight();
+        updateLCD("Turn Right");
+        break;
+      case 'S':
+        stopCar();
+        updateLCD("Stopped");
+        break;
+      case '0': motorSpeed = 100; break;
+      case '9': motorSpeed = 255; break;
+    }
+  }
+}
+
+// --- Helper Functions ---
+void updateLCD(String text) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("BT Control:");
+  lcd.setCursor(0, 1);
+  lcd.print(text);
+}
+
+void moveForward() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
+}
+
+void moveBackward() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
+}
+
+void turnLeft() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
+}
+
+void turnRight() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
+}
+
+void stopCar() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+}
