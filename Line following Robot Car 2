@@ -86,7 +86,7 @@ void loop() {
   unsigned long elapsed = (millis() - startTime) / 1000;
 
   // --- LINE FOLLOWING LOGIC ---
-  if (left == LOW && right == HIGH) {
+  if (left == HIGH && right == HIGH) {
     if (totalDistance < 29.0) {
       moveForward(speedBeforeStop); // Move forward before stop
     }
@@ -100,10 +100,10 @@ void loop() {
       moveForward(speedAfterStop); // Continue moving after stop
     }
   }
-  else if (left == HIGH && right == HIGH) {
+  else if (left == HIGH && right == LOW) {
     turnRight();
   }
-  else if (left == LOW && right == LOW) {
+  else if (left == LOW && right == HIGH) {
     turnLeft();
   }
   else {
