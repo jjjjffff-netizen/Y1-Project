@@ -26,7 +26,7 @@ const int moveDuration = 10000; // Move for 10 seconds
 // --- Function Prototypes for new movement functions ---
 void moveForward();
 void reverse();
-void turnRight();
+void turnLeft();
 // --------------------------------------------------------
 
 void setup() {
@@ -67,7 +67,7 @@ void setup() {
 		delay(1500); // Wait a bit before attempting to move
 		
 		// Immediately attempt to reroute if obstacle is in setup
-		turnRight(); 
+		turnLeft(); 
 		
 	}
 	
@@ -117,7 +117,7 @@ void loop() {
 			// 4. Turn Right (to reroute)
 			stopMotors();
 			delay(100); // Brief pause
-			turnRight();
+			turnLeft();
 			delay(500); // Turn for half a second
 
 			// 5. Resume Forward Movement
@@ -163,7 +163,7 @@ void reverse() {
   delay(50);
 }
 
-void turnRight() {
+void turnLeft() {
 	lcd.clear();
 	lcd.setCursor(0, 0);
 	lcd.print("Turning Right");
