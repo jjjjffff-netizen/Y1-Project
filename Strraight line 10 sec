@@ -5,10 +5,10 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
 // L298N motor driver pins
 int ENA = 11;    // PWM for left motor
-int IN1 = A1;    // Left motor direction
-int IN2 = A2;    // Left motor direction
-int IN3 = A3;   // Right motor direction
-int IN4 = A4;   // Right motor direction
+int IN1 = 1;    // Left motor direction
+int IN2 = 2;    // Left motor direction
+int IN3 = 12;   // Right motor direction
+int IN4 = 13;   // Right motor direction
 int ENB = 3;    // PWM for right motor
 
 void setup() {
