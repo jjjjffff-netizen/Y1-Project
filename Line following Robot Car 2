@@ -31,7 +31,7 @@ volatile byte lastPortB = 0;
 unsigned long startTime = 0;
 unsigned long lastLCDUpdate = 0;
 float totalDistance = 0.0; // Track total distance traveled
-bool isStopped = false; // Flag to check if the car is stopped after traveling 30 cm
+bool isStopped = false; // Flag to check if the car is stopped after traveling 290cm
 
 int speedBeforeStop = 150;
 int speedAfterStop = 85;
@@ -87,7 +87,7 @@ void loop() {
 
   // --- LINE FOLLOWING LOGIC ---
   if (left == HIGH && right == HIGH) {
-    if (totalDistance < 29.0) {
+    if (totalDistance < 290.0) {
       moveForward(speedBeforeStop); // Move forward before stop
     }
     else if (!isStopped) {
