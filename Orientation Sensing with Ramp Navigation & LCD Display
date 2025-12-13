@@ -12,8 +12,8 @@ Adafruit_MPU6050 mpu;
 // Motor Pins
 const int IN1 = 13;
 const int IN2 = 12;
-const int IN3 = 2;
-const int IN4 = A2; 
+const int IN3 = 0;
+const int IN4 = 1; 
 const int ENA = 11;
 const int ENB = 3;  
 
